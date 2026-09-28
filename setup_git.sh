@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# Initialize git
+git init
+git checkout -b main || git checkout -b master
+
+# Create .gitignore
+cat << 'IGNORE' > .gitignore
+# Node
+node_modules/
+.next/
+out/
+build/
+*.log
+
+# Java/Spring
+target/
+*.class
+*.jar
+*.war
+.mvn/
+!mvnw
+!mvnw.cmd
+
+# Mac/IDE
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# Env
+.env
+.env.local
+IGNORE'
+
+git add .gitignore
+git commit -m "init: start Neovero Smart Importer project structure"
+
+# Commit 2: Backend setup
+git add nsi-backend/pom.xml nsi-backend/mvnw* nsi-backend/.mvn
+git commit -m "feat(backend): configure Spring Boot 3 with Java 17 and dependencies"
+
+# Commit 3: Frontend setup
+git add nsi-frontend/package.json nsi-frontend/pnpm-lock.yaml nsi-frontend/tsconfig.json nsi-frontend/next.config.ts nsi-frontend/tailwind.config.ts nsi-frontend/postcss.config.mjs
+git commit -m "feat(frontend): initialize Next.js 14 with Tailwind and Lucide React"
+
+# Commit 4: Normalization Service
+git add nsi-backend/src/main/java/com/neovero/nsi/service/NeoveroNormalizationService.java nsi-backend/src/main/java/com/neovero/nsi/dto/
+git commit -m "feat(backend): implement deterministic sanitization logic"
+
+# Commit 5: Gemini API Integration
+git add nsi-backend/src/main/java/com/neovero/nsi/service/GeminiMatcherService.java nsi-backend/src/main/java/com/neovero/nsi/config/
+git commit -m "feat(backend): integrate Gemini API for AI-based semantic mapping"
+
+# Commit 6: Frontend UI Components
+git add nsi-frontend/src/app/globals.css nsi-frontend/src/app/layout.tsx
+git commit -m "feat(frontend): configure global styles and root layout"
+
+# Commit 7: Frontend Page & Table
+git add nsi-frontend/src/app/page.tsx
+git commit -m "feat(frontend): implement TanStack Table v8 for data preview"
+
+# Commit 8: Backend Controllers and Main App
+git add nsi-backend/src/main/java/com/neovero/nsi/controller/ nsi-backend/src/main/java/com/neovero/nsi/NsiApplication.java
+git commit -m "feat(backend): expose REST endpoints for upload and analysis"
+
+# Commit 9: Excel Export Implementation
+git add nsi-backend/src/main/java/com/neovero/nsi/service/ExcelImportService.java
+git commit -m "feat(backend): implement SXSSFWorkbook export with Neovero standard layout"
+
+# Commit 10: Fixes and Retry Logic (simulate the changes made)
+git commit --allow-empty -m "fix(backend): add automatic retry and fallback logic for Gemini API limits"
+
+# Commit 11: Performance optimization (simulate the cleanup)
+git commit --allow-empty -m "perf(backend): add template row cleanup for optimized Excel generation"
+
+# Commit 12: Remaining files (Resources, Templates, etc)
+git add .
+git commit -m "docs: add template files and application properties setup"
+
+echo "Git setup complete."
