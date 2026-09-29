@@ -30,10 +30,12 @@ public class ImportController {
     }
 
     @PostMapping("/analyze")
-    public ResponseEntity<MappingResponse> analyzeFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<MappingResponse> analyzeFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "instructions", required = false) String instructions) {
         try {
             List<List<String>> sample = excelImportService.extractSampleRows(file, 20);
-            MappingResponse mapping = geminiMatcherService.analyzeSample(sample);
+            MappingResponse mapping = geminiMatcherService.analyzeSample(sample, instructions);
             
             // Extract available headers
             if (mapping != null && mapping.getHeaderRowIndex() != null && mapping.getHeaderRowIndex() < sample.size()) {

@@ -8,6 +8,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import * as XLSX from "xlsx";
 
 // Type definitions
 type MappingResponse = {
@@ -32,10 +33,12 @@ type EquipmentPreview = {
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [instructions, setInstructions] = useState<string>("");
   const [step, setStep] = useState<number>(1);
   const [loading, setLoading] = useState(false);
   const [mapping, setMapping] = useState<MappingResponse | null>(null);
   const [previewData, setPreviewData] = useState<EquipmentPreview[]>([]);
+  const [finalBlob, setFinalBlob] = useState<Blob | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -71,6 +74,9 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (instructions) {
+        formData.append("instructions", instructions);
+      }
       
       const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/analyze`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
@@ -94,41 +100,60 @@ export default function Home() {
       formData.append("file", file);
       formData.append("mapping", new Blob([JSON.stringify(mapping)], { type: "application/json" }));
 
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/preview`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+      // Calls export immediately to parse and show the final result
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/export`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        responseType: 'blob'
       });
       
-      setPreviewData([
-        { id: 1, abbreviation: "MONI", family: "MONITOR", model: "CARESCAPE B650", manufacturer: "GE", patrimony: "10023", serialNumber: "SN12345", sectorCode: "SALAA", isDuplicateSerial: false },
-        { id: 2, abbreviation: "MONI", family: "MONITOR", model: "CARESCAPE B650", manufacturer: "GE", patrimony: "10024", serialNumber: "SN12345", sectorCode: "SALAB", isDuplicateSerial: true },
-        { id: 3, abbreviation: "ARCO", family: "AR CONDICIONADO", model: "SPLIT - 12000 BTUS", manufacturer: "LG", patrimony: "10025", serialNumber: "SN9999", sectorCode: "RECPA", isDuplicateSerial: false },
-      ]);
+      const blob = new Blob([res.data]);
+      setFinalBlob(blob);
+
+      // Parse with SheetJS
+      const arrayBuffer = await blob.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      // Map to EquipmentPreview
+      const mappedData: EquipmentPreview[] = jsonData.slice(0, 50).map((row, idx) => ({
+        id: idx + 1,
+        abbreviation: row["SIGLA_EQUIPAMENTO"] || "-",
+        family: row["EQUIPAMENTO"] || "-",
+        model: row["MODELO"] || "-",
+        manufacturer: row["FABRICANTE"] || "-",
+        patrimony: row["PATRIMONIO"] || "-",
+        serialNumber: row["NUMERO_SERIE"] || "-",
+        sectorCode: row["COD_SETOR"] || "-",
+        isDuplicateSerial: false // Ideally, you'd calculate this or get it from backend
+      }));
+
+      // Basic duplicate detection for preview
+      const serials = new Set();
+      mappedData.forEach(item => {
+        if (item.serialNumber && item.serialNumber !== "-") {
+          if (serials.has(item.serialNumber)) item.isDuplicateSerial = true;
+          else serials.add(item.serialNumber);
+        }
+      });
+
+      setPreviewData(mappedData);
       setStep(3);
     } catch (error) {
       console.error(error);
-      alert("Erro ao pré-visualizar dados");
+      alert("Erro ao processar arquivo");
     } finally {
       setLoading(false);
     }
   };
 
   const exportExcel = async () => {
-    if (!file || !mapping) return;
-    setLoading(true);
+    if (!finalBlob) return;
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("mapping", new Blob([JSON.stringify(mapping)], { type: "application/json" }));
-
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/export`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        responseType: 'blob'
-      });
-      
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = window.URL.createObjectURL(finalBlob);
       const link = document.createElement('a');
       link.href = url;
-      const originalName = file.name.replace(/\.[^/.]+$/, "");
+      const originalName = file?.name.replace(/\.[^/.]+$/, "") || "Planilha";
       link.setAttribute('download', `${originalName} NSI.xlsx`);
       document.body.appendChild(link);
       link.click();
@@ -214,6 +239,17 @@ export default function Home() {
                     <p className="text-sm text-neovero-neutral-800">ou clique para procurar no seu computador (.xlsx, .xls, .csv)</p>
                   </div>
                 </label>
+              </div>
+
+              <div className="w-full max-w-3xl mt-6">
+                <label className="block text-sm font-semibold text-neovero-blue mb-2">Instruções adicionais para a Inteligência Artificial (Opcional)</label>
+                <textarea 
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  placeholder="Ex: A coluna 'LOCAL' significa Setor. Considere apenas os equipamentos da marca GE."
+                  className="w-full bg-white border border-neovero-neutral-200 rounded-xl p-4 text-sm text-neovero-neutral-800 focus:outline-none focus:ring-2 focus:ring-neovero-orange/50 focus:border-neovero-orange transition-all shadow-sm resize-none"
+                  rows={3}
+                />
               </div>
 
               <button 

@@ -13,6 +13,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+import AuthWrapper from "@/components/auth/AuthWrapper";
+
 export const metadata: Metadata = {
   title: "Smart Importer",
   description: "CMMS/EAM Integral para Engenharia Clínica e Manutenção",
@@ -25,10 +27,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-neovero-neutral-50 text-neovero-neutral-800 font-sans">
-        <Navbar />
-        <main className="flex-1 w-full min-w-0 flex flex-col">
-          {children}
-        </main>
+        <AuthWrapper>
+          <Navbar />
+          <main className="flex-1 w-full min-w-0 flex flex-col">
+            {children}
+          </main>
+        </AuthWrapper>
       </body>
     </html>
   );

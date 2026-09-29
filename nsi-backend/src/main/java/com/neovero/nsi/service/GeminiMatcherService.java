@@ -28,7 +28,7 @@ public class GeminiMatcherService {
         this.restTemplate = new RestTemplate();
     }
 
-    public MappingResponse analyzeSample(List<List<String>> sampleRows) {
+    public MappingResponse analyzeSample(List<List<String>> sampleRows, String additionalInstructions) {
         String sampleJson;
         try {
             sampleJson = objectMapper.writeValueAsString(sampleRows);
@@ -69,9 +69,9 @@ public class GeminiMatcherService {
                 4. A coluna 'BEM' (quando é número) é o Código Extra/Legado ('legacyCode').
                 5. A coluna 'LOCALIDADE' equivale a 'centroCustoSourceColumn' e 'SETOR' a 'setorSourceColumn'. Se existirem colunas numéricas (como 'CODIGO LOCALIDADE', 'CODIGO SETOR'), não esqueça de mapeá-las em 'centroCustoIdColumn' e 'setorIdColumn'.
                 
-                Retorne APENAS o JSON válido, sem formatações adicionais ou markdown. Use os nomes das colunas exatos que encontrar na linha de cabeçalho.
                 Se uma coluna não puder ser identificada, deixe null.
-
+                
+                """ + (additionalInstructions != null && !additionalInstructions.isBlank() ? "INSTRUÇÕES ADICIONAIS DO USUÁRIO:\n" + additionalInstructions + "\n\n" : "") + """
                 Amostra:
                 """ + sampleJson;
 
