@@ -16,10 +16,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Smart Importer",
   description: "CMMS/EAM Integral para Engenharia Clínica e Manutenção",
-  icons: {
-    icon: "/favicon.svg",
-    apple: "/favicon.svg"
-  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
