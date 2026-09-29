@@ -91,4 +91,32 @@ public class ImportController {
                 .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 .body(history.getProcessedFileData());
     }
+
+    @PutMapping("/history/{id}/file")
+    public ResponseEntity<Void> updateHistoryFile(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        try {
+            ImportHistory history = importHistoryRepository.findById(id).orElseThrow();
+            history.setProcessedFileData(file.getBytes());
+            importHistoryRepository.save(history);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<com.neovero.nsi.dto.AnalyticsResponse> getAnalytics() {
+        long totalImports = importHistoryRepository.count();
+        long totalRows = importHistoryRepository.sumTotalRows();
+        long completed = importHistoryRepository.countCompletedImports();
+        long pending = importHistoryRepository.countPendingImports();
+        
+        return ResponseEntity.ok(com.neovero.nsi.dto.AnalyticsResponse.builder()
+                .totalImports(totalImports)
+                .totalRowsProcessed(totalRows)
+                .completedImports(completed)
+                .pendingImports(pending)
+                .build());
+    }
 }
