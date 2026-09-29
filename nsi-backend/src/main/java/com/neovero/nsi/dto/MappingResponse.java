@@ -7,6 +7,7 @@ import lombok.Data;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MappingResponse {
     private Integer headerRowIndex;
+    private java.util.List<String> availableColumns;
     private Hierarchy hierarchy;
     private Mappings mappings;
     private Flags flags;
@@ -14,7 +15,9 @@ public class MappingResponse {
     @Data
     public static class Hierarchy {
         private String centroCustoSourceColumn;
+        private String centroCustoIdColumn;
         private String setorSourceColumn;
+        private String setorIdColumn;
     }
 
     @Data
