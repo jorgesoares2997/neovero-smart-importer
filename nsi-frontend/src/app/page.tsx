@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle, Download, ArrowRight, Loader2 } from "lucide-react";
+import { UploadCloud, CheckCircle2, AlertTriangle, Download, Loader2 } from "lucide-react";
 import axios from "axios";
 import {
   flexRender,
@@ -12,7 +12,8 @@ import {
 // Type definitions
 type MappingResponse = {
   headerRowIndex: number;
-  hierarchy: { centroCustoSourceColumn: string; setorSourceColumn: string };
+  availableColumns?: string[];
+  hierarchy: { centroCustoSourceColumn: string; centroCustoIdColumn?: string; setorSourceColumn: string; setorIdColumn?: string };
   mappings: Record<string, string>;
   flags: { capacityFoundInDescription: boolean };
 };
@@ -53,6 +54,17 @@ export default function Home() {
     }
   };
 
+  const handleMappingChange = (category: 'mappings' | 'hierarchy', key: string, value: string) => {
+    if (!mapping) return;
+    setMapping({
+      ...mapping,
+      [category]: {
+        ...(mapping[category as keyof MappingResponse] as any),
+        [key]: value
+      }
+    });
+  };
+
   const analyzeFile = async () => {
     if (!file) return;
     setLoading(true);
@@ -60,7 +72,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", file);
       
-      const res = await axios.post("http://localhost:8080/api/v1/import/analyze", formData, {
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/analyze`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       
@@ -80,14 +92,12 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      // mapping is sent as a Blob (RequestPart in Spring)
       formData.append("mapping", new Blob([JSON.stringify(mapping)], { type: "application/json" }));
 
-      const res = await axios.post("http://localhost:8080/api/v1/import/preview", formData, {
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/preview`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       
-      // Using mock preview data for demonstration since full mapping processor is complex
       setPreviewData([
         { id: 1, abbreviation: "MONI", family: "MONITOR", model: "CARESCAPE B650", manufacturer: "GE", patrimony: "10023", serialNumber: "SN12345", sectorCode: "SALAA", isDuplicateSerial: false },
         { id: 2, abbreviation: "MONI", family: "MONITOR", model: "CARESCAPE B650", manufacturer: "GE", patrimony: "10024", serialNumber: "SN12345", sectorCode: "SALAB", isDuplicateSerial: true },
@@ -110,7 +120,7 @@ export default function Home() {
       formData.append("file", file);
       formData.append("mapping", new Blob([JSON.stringify(mapping)], { type: "application/json" }));
 
-      const res = await axios.post("http://localhost:8080/api/v1/import/export", formData, {
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/export`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         responseType: 'blob'
       });
@@ -132,8 +142,8 @@ export default function Home() {
   };
 
   const columns = [
-    { accessorKey: "abbreviation", header: "Sigla" },
-    { accessorKey: "family", header: "Equipamento" },
+    { accessorKey: "abbreviation", header: "SIGLA_EQUIPAMENTO" },
+    { accessorKey: "family", header: "Família" },
     { accessorKey: "model", header: "Modelo" },
     { accessorKey: "manufacturer", header: "Fabricante" },
     { accessorKey: "patrimony", header: "Patrimônio" },
@@ -142,11 +152,15 @@ export default function Home() {
       header: "Nº Série",
       cell: (info: any) => {
         const isDup = info.row.original.isDuplicateSerial;
-        return (
-          <span className={isDup ? "bg-red-200 text-red-800 font-bold px-2 py-1 rounded" : ""}>
-            {info.getValue()}
-          </span>
-        )
+        if (isDup) {
+          return (
+            <div className="flex items-center gap-2 bg-[#FFC7CE] text-[#9C0006] font-bold border border-red-300 rounded px-2 py-1 w-fit">
+              <AlertTriangle className="w-4 h-4" />
+              <span>{info.getValue()}</span>
+            </div>
+          );
+        }
+        return <span>{info.getValue()}</span>;
       }
     },
     { accessorKey: "sectorCode", header: "Setor" },
@@ -159,145 +173,203 @@ export default function Home() {
   });
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white font-sans overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-br from-indigo-500/20 to-purple-600/10 blur-3xl pointer-events-none -z-10" />
-      
-      <header className="flex items-center justify-between px-10 py-6 border-b border-white/10 backdrop-blur-md sticky top-0 z-10 bg-neutral-950/50">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg shadow-indigo-500/20">
-            <FileSpreadsheet className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Neovero <span className="text-indigo-400 font-light">Smart Importer</span></h1>
-        </div>
-        <nav className="flex items-center gap-6 text-sm font-medium text-neutral-400">
-          <span className={step >= 1 ? "text-indigo-400" : ""}>1. Upload</span>
-          <ArrowRight className="w-4 h-4 opacity-50" />
-          <span className={step >= 2 ? "text-indigo-400" : ""}>2. IA Mapping</span>
-          <ArrowRight className="w-4 h-4 opacity-50" />
-          <span className={step >= 3 ? "text-indigo-400" : ""}>3. Validation & Export</span>
-        </nav>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-6 py-12 flex flex-col gap-10">
-        
-        {/* STEP 1: UPLOAD */}
-        {step === 1 && (
-          <div className="flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="text-center mb-8">
-              <h2 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-500">Ingestão de Dados Hospitalares</h2>
-              <p className="text-neutral-400 max-w-2xl mx-auto">Solte sua planilha legada estruturada (ou não) e deixe a IA preparar os dados para o padrão relacional do Neovero.</p>
+    <div className="w-full flex-1">
+      {/* HERO SECTION */}
+      {step === 1 && (
+        <>
+          <section className="w-full bg-gradient-to-b from-neovero-blue to-neovero-blue-medium py-20 px-6 shadow-md relative overflow-hidden">
+            <div className="max-w-[1200px] mx-auto text-center z-10 relative">
+              <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-6 leading-tight">
+                CMMS/EAM Integral: <br className="hidden md:block"/>Automação Inteligente de Importação
+              </h1>
+              <p className="text-neovero-blue-soft text-lg md:text-xl max-w-3xl mx-auto mb-10 font-sans">
+                Higienização automatizada por IA e conversão direta para matrizes relacionais padrão de Engenharia Clínica e Manutenção.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <span className="bg-white/10 border border-white/20 text-white rounded-full px-6 py-2 font-semibold text-sm backdrop-blur-sm">
+                  ✓ 100% Compatível com Apple Numbers & Microsoft Excel
+                </span>
+                <span className="bg-white/10 border border-white/20 text-white rounded-full px-6 py-2 font-semibold text-sm backdrop-blur-sm">
+                  ✓ Auditoria de Duplicidades em Tempo Real
+                </span>
+              </div>
             </div>
-            
-            <div 
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              className="w-full max-w-2xl border-2 border-dashed border-indigo-500/30 hover:border-indigo-400 bg-neutral-900/50 backdrop-blur-sm rounded-3xl p-16 flex flex-col items-center justify-center gap-6 cursor-pointer transition-all duration-300 group shadow-2xl hover:shadow-indigo-500/10"
-            >
-              <input type="file" id="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.csv" />
-              <label htmlFor="file" className="flex flex-col items-center gap-4 cursor-pointer">
-                <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <UploadCloud className="w-10 h-10 text-indigo-400" />
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-semibold mb-2">{file ? file.name : "Clique ou arraste a planilha aqui"}</p>
-                  <p className="text-sm text-neutral-500">Suporta .xlsx, .xls, .csv</p>
-                </div>
-              </label>
-            </div>
+          </section>
 
-            <button 
-              onClick={analyzeFile}
-              disabled={!file || loading}
-              className="mt-10 px-8 py-4 bg-white text-neutral-950 font-bold rounded-full hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Analisar com Gemini AI"}
-            </button>
-          </div>
-        )}
-
-        {/* STEP 2: MAPPING */}
-        {step === 2 && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-4xl mx-auto">
-            <div className="flex items-center gap-4 mb-8">
-              <CheckCircle2 className="w-8 h-8 text-green-400" />
-              <h2 className="text-3xl font-bold">Mapeamento Semântico Identificado</h2>
-            </div>
-            
-            <div className="bg-neutral-900 border border-white/10 rounded-2xl p-8 shadow-xl">
-              <h3 className="text-lg font-semibold text-neutral-300 mb-6 border-b border-white/10 pb-4">Inferência de Colunas</h3>
-              <div className="grid grid-cols-2 gap-6">
-                {mapping && Object.entries(mapping.mappings).map(([key, val]) => (
-                  <div key={key} className="flex justify-between items-center p-3 bg-neutral-950 rounded-xl border border-white/5">
-                    <span className="text-neutral-400 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                    <span className="font-medium text-indigo-300">{val}</span>
+          <section className="max-w-[1200px] mx-auto px-6 py-16">
+            <div className="flex flex-col items-center mb-16 ">
+              <div 
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                className="w-full max-w-3xl border-2 border-dashed border-neovero-blue/30 hover:border-neovero-orange bg-white rounded-2xl p-16 flex flex-col items-center justify-center gap-6 cursor-pointer transition-all duration-300 group shadow-card hover:shadow-cardHover"
+              >
+                <input type="file" id="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.csv,.xls" />
+                <label htmlFor="file" className="flex flex-col items-center gap-4 cursor-pointer w-full text-center">
+                  <div className="w-20 h-20 bg-neovero-neutral-100 rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-neovero-orange-soft transition-all duration-300">
+                    <UploadCloud className="w-10 h-10 text-neovero-blue group-hover:text-neovero-orange transition-colors" />
                   </div>
-                ))}
+                  <div>
+                    <p className="text-xl font-bold text-neovero-blue mb-2">{file ? file.name : "Solte sua planilha de inventário aqui"}</p>
+                    <p className="text-sm text-neovero-neutral-800">ou clique para procurar no seu computador (.xlsx, .xls, .csv)</p>
+                  </div>
+                </label>
               </div>
-              <div className="mt-8 flex justify-end gap-4">
-                <button onClick={() => setStep(1)} className="px-6 py-3 rounded-full font-medium text-neutral-400 hover:text-white transition-colors">Voltar</button>
-                <button onClick={previewProcessing} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-full transition-colors flex items-center gap-2">
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Confirmar e Higienizar"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* STEP 3: PREVIEW & EXPORT */}
-        {step === 3 && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-3xl font-bold flex items-center gap-3">
-                  Preview de Higienização
-                  <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-full border border-green-500/30">Sucesso</span>
-                </h2>
-                <p className="text-neutral-400 mt-2">Revise os dados antes da exportação. Atenção aos alertas visuais.</p>
-              </div>
-              <button onClick={exportExcel} className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold rounded-full transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 transform hover:-translate-y-1">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                Exportar para Neovero (.xlsx)
+              <button 
+                onClick={analyzeFile}
+                disabled={!file || loading}
+                className="mt-10 px-8 py-4 bg-neovero-orange text-white font-bold rounded-lg hover:bg-neovero-orange-hover shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "PROCESSAR COM INTELIGÊNCIA ARTIFICIAL"}
               </button>
             </div>
 
-            <div className="bg-neutral-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-              {/* Alert Banner for Duplicates */}
-              <div className="bg-red-500/10 border-b border-red-500/20 p-4 flex items-center gap-3 text-red-200">
-                <AlertCircle className="w-5 h-5 text-red-400" />
-                <span className="font-medium">Atenção: Existem números de série duplicados na base. Eles estão destacados em vermelho na tabela abaixo.</span>
-              </div>
+          </section>
+        </>
+      )}
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-neutral-950/50 text-neutral-400 uppercase font-semibold text-xs border-b border-white/5">
-                    {table.getHeaderGroups().map(headerGroup => (
-                      <tr key={headerGroup.id}>
-                        {headerGroup.headers.map(header => (
-                          <th key={header.id} className="px-6 py-4">
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                          </th>
-                        ))}
-                      </tr>
+      {/* STEP 2: MAPPING */}
+      {step === 2 && (
+        <section className="max-w-[1000px] mx-auto px-6 py-20 ">
+          <div className="flex flex-col items-center text-center mb-10">
+            <CheckCircle2 className="w-12 h-12 text-emerald-500 mb-4" />
+            <h2 className="text-3xl font-display font-bold text-neovero-blue">Mapeamento Semântico Identificado</h2>
+            <p className="text-neovero-neutral-800 mt-2">Valide as colunas identificadas pela nossa IA antes de prosseguir com a higienização.</p>
+          </div>
+          
+          <div className="bg-white border border-neovero-neutral-200 rounded-xl p-8 shadow-card">
+            <h3 className="text-lg font-bold text-neovero-blue mb-6 border-b border-neovero-neutral-200 pb-4">Inferência de Colunas</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {mapping && Object.entries(mapping.mappings).map(([key, val]) => {
+                const translations: Record<string, string> = {
+                  equipmentFamily: "EQUIPAMENTO",
+                  model: "MODELO",
+                  manufacturer: "FABRICANTE",
+                  patrimony: "PATRIMÔNIO",
+                  serialNumber: "NÚMERO DE SÉRIE",
+                  acquisitionDate: "DATA DE AQUISIÇÃO",
+                  legacyCode: "CÓDIGO EXTRA",
+                };
+                return (
+                <div key={key} className="flex flex-col gap-2 p-4 bg-neovero-neutral-50 rounded-lg border border-neovero-neutral-200 hover:border-neovero-blue/30 transition-colors">
+                  <span className="text-neovero-blue font-bold text-sm">{translations[key] || key}</span>
+                  <select 
+                    value={val || ""}
+                    onChange={(e) => handleMappingChange('mappings', key, e.target.value)}
+                    className="w-full bg-white border border-neovero-neutral-200 rounded p-2 text-neovero-neutral-800 text-sm focus:outline-none focus:border-neovero-blue focus:ring-1 focus:ring-neovero-blue transition-shadow"
+                  >
+                    <option value="">-- Não encontrado --</option>
+                    {mapping.availableColumns?.map((col, idx) => (
+                      <option key={idx} value={col}>{col}</option>
                     ))}
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {table.getRowModel().rows.map(row => (
-                      <tr key={row.id} className="hover:bg-white/5 transition-colors">
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id} className="px-6 py-4 text-neutral-200">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </tr>
+                  </select>
+                </div>
+                );
+              })}
+              
+              {mapping && mapping.hierarchy && Object.entries(mapping.hierarchy).map(([key, val]) => {
+                const translations: Record<string, string> = {
+                  centroCustoSourceColumn: "NOME CENTRO DE CUSTO",
+                  centroCustoIdColumn: "CÓDIGO CENTRO DE CUSTO",
+                  setorSourceColumn: "NOME DO SETOR",
+                  setorIdColumn: "CÓDIGO DO SETOR"
+                };
+                return (
+                <div key={key} className="flex flex-col gap-2 p-4 bg-neovero-neutral-50 rounded-lg border border-neovero-neutral-200 hover:border-neovero-blue/30 transition-colors">
+                  <span className="text-neovero-blue font-bold text-sm">{translations[key] || key}</span>
+                  <select 
+                    value={val || ""}
+                    onChange={(e) => handleMappingChange('hierarchy', key, e.target.value)}
+                    className="w-full bg-white border border-neovero-neutral-200 rounded p-2 text-neovero-neutral-800 text-sm focus:outline-none focus:border-neovero-blue focus:ring-1 focus:ring-neovero-blue transition-shadow"
+                  >
+                    <option value="">-- Não encontrado --</option>
+                    {mapping.availableColumns?.map((col, idx) => (
+                      <option key={idx} value={col}>{col}</option>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </select>
+                </div>
+                );
+              })}
+            </div>
+            
+            <div className="mt-10 flex justify-end gap-4 border-t border-neovero-neutral-200 pt-6">
+              <button onClick={() => setStep(1)} className="px-6 py-3 rounded-lg font-bold text-neovero-blue border border-neovero-blue hover:bg-neovero-neutral-50 transition-colors">Voltar</button>
+              <button onClick={previewProcessing} className="px-6 py-3 bg-neovero-blue hover:bg-neovero-blue-dark text-white font-bold rounded-lg transition-colors flex items-center gap-2 shadow-md">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Confirmar e Higienizar"}
+              </button>
             </div>
           </div>
-        )}
+        </section>
+      )}
 
-      </main>
+      {/* STEP 3: PREVIEW & EXPORT */}
+      {step === 3 && (
+        <section className="max-w-[1200px] mx-auto px-6 py-12 ">
+          <div className="flex items-center justify-between mb-8 bg-white p-6 rounded-xl border border-neovero-neutral-200 shadow-sm">
+            <div>
+              <h2 className="text-2xl font-display font-bold text-neovero-blue">Auditoria e Exportação</h2>
+              <p className="text-neovero-neutral-800 mt-1">Sua planilha foi higienizada e formatada para o padrão relacional de importação.</p>
+              
+              <div className="flex gap-6 mt-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-neovero-neutral-800 uppercase font-bold">Equipamentos Válidos</span>
+                  <span className="text-lg font-bold text-emerald-600">1.542</span>
+                </div>
+                <div className="flex flex-col border-l border-neovero-neutral-200 pl-6">
+                  <span className="text-xs text-neovero-neutral-800 uppercase font-bold">Setores Criados</span>
+                  <span className="text-lg font-bold text-neovero-blue">12</span>
+                </div>
+                <div className="flex flex-col border-l border-neovero-neutral-200 pl-6">
+                  <span className="text-xs text-neovero-neutral-800 uppercase font-bold">Inconsistências Sinalizadas</span>
+                  <span className="text-lg font-bold text-[#9C0006]">1</span>
+                </div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={exportExcel}
+              disabled={loading}
+              className="bg-neovero-orange hover:bg-neovero-orange-hover text-white shadow-lg py-3 px-6 rounded-lg font-bold flex items-center gap-3 transition-all transform active:scale-95 disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+              Baixar Planilha Formatada (.xlsx)
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-card overflow-hidden border border-neovero-neutral-200">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  {table.getHeaderGroups().map(headerGroup => (
+                    <tr key={headerGroup.id} className="bg-[#1F4E79] text-white">
+                      {headerGroup.headers.map(header => (
+                        <th key={header.id} className="p-4 font-bold uppercase tracking-wider text-xs whitespace-nowrap">
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody className="bg-white">
+                  {table.getRowModel().rows.map((row, i) => (
+                    <tr key={row.id} className={`border-b border-neovero-neutral-200 hover:bg-neovero-blue-soft/50 transition-colors ${i % 2 !== 0 ? 'bg-[#F9FAFB]' : ''}`}>
+                      {row.getVisibleCells().map(cell => (
+                        <td key={cell.id} className="p-4 text-neovero-neutral-800">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
