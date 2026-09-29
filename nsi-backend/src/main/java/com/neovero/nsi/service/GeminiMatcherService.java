@@ -19,12 +19,14 @@ public class GeminiMatcherService {
 
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
+    private final com.neovero.nsi.repository.GlobalRuleRepository globalRuleRepository;
 
     @Value("${spring.ai.vertex.ai.gemini.api-key:${GEMINI_API_KEY:}}")
     private String apiKey;
 
-    public GeminiMatcherService(ObjectMapper objectMapper) {
+    public GeminiMatcherService(ObjectMapper objectMapper, com.neovero.nsi.repository.GlobalRuleRepository globalRuleRepository) {
         this.objectMapper = objectMapper;
+        this.globalRuleRepository = globalRuleRepository;
         this.restTemplate = new RestTemplate();
     }
 
@@ -34,6 +36,18 @@ public class GeminiMatcherService {
             sampleJson = objectMapper.writeValueAsString(sampleRows);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error converting sample to JSON", e);
+        }
+
+        StringBuilder rulesBuilder = new StringBuilder();
+        List<com.neovero.nsi.domain.GlobalRule> globalRules = globalRuleRepository.findAll();
+        if (!globalRules.isEmpty()) {
+            rulesBuilder.append("REGRAS GLOBAIS DEFINIDAS PELO ADMINISTRADOR (SIGA ESTAS REGRAS ACIMA DE TUDO):\n");
+            for (com.neovero.nsi.domain.GlobalRule rule : globalRules) {
+                rulesBuilder.append("- Se a coluna original for '").append(rule.getSourceColumnName())
+                            .append("', mapeie OBRIGATORIAMENTE para '").append(rule.getTargetMappingField())
+                            .append("'. (Motivo: ").append(rule.getDescription()).append(")\n");
+            }
+            rulesBuilder.append("\n");
         }
 
         String prompt = """
@@ -71,7 +85,7 @@ public class GeminiMatcherService {
                 
                 Se uma coluna não puder ser identificada, deixe null.
                 
-                """ + (additionalInstructions != null && !additionalInstructions.isBlank() ? "INSTRUÇÕES ADICIONAIS DO USUÁRIO:\n" + additionalInstructions + "\n\n" : "") + """
+                """ + rulesBuilder.toString() + (additionalInstructions != null && !additionalInstructions.isBlank() ? "INSTRUÇÕES ADICIONAIS DO USUÁRIO:\n" + additionalInstructions + "\n\n" : "") + """
                 Amostra:
                 """ + sampleJson;
 
