@@ -74,10 +74,21 @@ export default function HistoryPage() {
   });
 
   useEffect(() => {
+    const cachedHistory = localStorage.getItem("nsi_history_cache");
+    if (cachedHistory) {
+      try {
+        setImports(JSON.parse(cachedHistory));
+        setLoading(false);
+      } catch (e) {
+        console.error("Failed to parse cache", e);
+      }
+    }
+
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/history`)
       .then(res => res.json())
       .then(data => {
         setImports(data);
+        localStorage.setItem("nsi_history_cache", JSON.stringify(data));
         setLoading(false);
       })
       .catch(err => {

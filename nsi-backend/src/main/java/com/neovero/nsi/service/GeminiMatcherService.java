@@ -75,7 +75,7 @@ public class GeminiMatcherService {
                 Amostra:
                 """ + sampleJson;
 
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+        List<String> modelPool = List.of("gemini-2.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-flash");
 
         Map<String, Object> requestBody = Map.of(
                 "contents", List.of(
@@ -90,35 +90,41 @@ public class GeminiMatcherService {
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
 
-        int maxRetries = 5;
-        int attempt = 0;
-        while (attempt < maxRetries) {
-            try {
-                attempt++;
-                ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
-                Map<String, Object> body = response.getBody();
-                if (body != null && body.containsKey("candidates")) {
-                    List<Map<String, Object>> candidates = (List<Map<String, Object>>) body.get("candidates");
-                    if (!candidates.isEmpty()) {
-                        Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
-                        List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-                        if (!parts.isEmpty()) {
-                            String text = (String) parts.get(0).get("text");
-                            text = text.replace("```json", "").replace("```", "").trim();
-                            return objectMapper.readValue(text, MappingResponse.class);
+        int maxRetriesPerModel = 2;
+        
+        for (String modelName : modelPool) {
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
+            int attempt = 0;
+            
+            while (attempt < maxRetriesPerModel) {
+                try {
+                    attempt++;
+                    ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+                    Map<String, Object> body = response.getBody();
+                    if (body != null && body.containsKey("candidates")) {
+                        List<Map<String, Object>> candidates = (List<Map<String, Object>>) body.get("candidates");
+                        if (!candidates.isEmpty()) {
+                            Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
+                            List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+                            if (!parts.isEmpty()) {
+                                String text = (String) parts.get(0).get("text");
+                                text = text.replace("```json", "").replace("```", "").trim();
+                                return objectMapper.readValue(text, MappingResponse.class);
+                            }
                         }
                     }
+                    throw new RuntimeException("Invalid response from Gemini API");
+                } catch (org.springframework.web.client.HttpServerErrorException.ServiceUnavailable | org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+                    if (attempt >= maxRetriesPerModel) {
+                        System.err.println("Model " + modelName + " is unavailable or rate limited. Falling back to next model...");
+                        break; // break the while loop, go to the next model in the pool
+                    }
+                    try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                } catch (Exception e) {
+                    throw new RuntimeException("Error calling Gemini API with model " + modelName + ": " + e.getMessage(), e);
                 }
-                throw new RuntimeException("Invalid response from Gemini API");
-            } catch (org.springframework.web.client.HttpServerErrorException.ServiceUnavailable e) {
-                if (attempt >= maxRetries) {
-                    throw new RuntimeException("Error calling Gemini API: High demand, all retries failed.", e);
-                }
-                try { Thread.sleep(4000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
-            } catch (Exception e) {
-                throw new RuntimeException("Error calling Gemini API: " + e.getMessage(), e);
             }
         }
-        throw new RuntimeException("Max retries exceeded for Gemini API");
+        throw new RuntimeException("All models in the pool failed or are unavailable.");
     }
 }
