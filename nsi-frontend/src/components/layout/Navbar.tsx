@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, LogOut } from "lucide-react";
+import { useAuthStore } from "@/store/authStore";
 
 export function Navbar() {
+  const { user, signOut } = useAuthStore();
   return (
     <header className="w-full bg-white border-b border-neovero-neutral-200 h-[80px] sticky top-0 z-50 flex items-center shadow-sm">
       <div className="max-w-[1500px] w-full mx-auto px-6 flex items-center justify-between">
@@ -31,6 +35,22 @@ export function Navbar() {
             >
               Novo Processamento
             </Link>
+            
+            {user && (
+              <div className="flex items-center gap-3 border-l border-neovero-neutral-200 pl-4 ml-2">
+                <span className="hidden lg:block text-xs font-medium text-neovero-neutral-600 truncate max-w-[150px]" title={user.email}>
+                  {user.email}
+                </span>
+                <button 
+                  onClick={() => signOut()}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-neovero-neutral-600 hover:text-red-500 transition-colors uppercase tracking-wider"
+                  title="Sair"
+                >
+                  <LogOut size={16} />
+                  <span className="hidden sm:inline">Sair</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
