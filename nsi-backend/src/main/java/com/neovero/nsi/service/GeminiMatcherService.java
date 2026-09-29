@@ -44,21 +44,31 @@ public class GeminiMatcherService {
                   "headerRowIndex": 0, // índice 0-based da linha que contém os cabeçalhos das colunas
                   "hierarchy": {
                     "centroCustoSourceColumn": "NOME_DA_COLUNA", // coluna que representa o Centro de Custo/Unidade (mais abrangente)
-                    "setorSourceColumn": "NOME_DA_COLUNA" // coluna que representa o Setor/Sala (específico)
+                    "centroCustoIdColumn": "NOME_DA_COLUNA", // (NOVO) coluna de ID do Centro de Custo (ex: CODIGO LOCALIDADE, se houver)
+                    "setorSourceColumn": "NOME_DA_COLUNA", // coluna que representa o Setor/Sala (específico)
+                    "setorIdColumn": "NOME_DA_COLUNA" // (NOVO) coluna de ID do Setor (ex: CODIGO SETOR, se houver)
                   },
                   "mappings": {
                     "equipmentFamily": "NOME_DA_COLUNA", // Equipamento/Família
                     "model": "NOME_DA_COLUNA", // Modelo
                     "manufacturer": "NOME_DA_COLUNA", // Fabricante/Marca
-                    "patrimony": "NOME_DA_COLUNA", // Patrimônio/Plaqueta/Tombamento
+                    "patrimony": "NOME_DA_COLUNA", // Patrimônio/Plaqueta
                     "serialNumber": "NOME_DA_COLUNA", // Número de Série
-                    "acquisitionDate": "NOME_DA_COLUNA", // Data de Aquisição (se houver)
-                    "legacyCode": "NOME_DA_COLUNA" // Código legado/BEM (se houver)
+                    "acquisitionDate": "NOME_DA_COLUNA", // Data de Aquisição (Tombamento, se houver)
+                    "legacyCode": "NOME_DA_COLUNA" // Código legado/BEM numérico (se houver)
                   },
                   "flags": {
                     "capacityFoundInDescription": true/false // se encontrou capacidades (ex: BTUS) junto nas descrições
                   }
                 }
+                
+                ATENÇÃO MÁXIMA PARA AS SEGUINTES REGRAS DA MATRIZ NEOVERO:
+                1. As células destino obrigatórias na saída (amarelas) são: SIGLA_EQUIPAMENTO, EQUIPAMENTO, MODELO, FABRICANTE, PATRIMONIO, NUMERO_SERIE, COD_SETOR, SITUACAO. Tente encontrar as colunas de origem equivalentes.
+                2. A coluna de origem 'PLAQUETA' quase sempre equivale a 'PATRIMONIO'.
+                3. A coluna de origem 'TOMBAMENTO' quase sempre equivale a DATA DE AQUISIÇÃO ('acquisitionDate').
+                4. A coluna 'BEM' (quando é número) é o Código Extra/Legado ('legacyCode').
+                5. A coluna 'LOCALIDADE' equivale a 'centroCustoSourceColumn' e 'SETOR' a 'setorSourceColumn'. Se existirem colunas numéricas (como 'CODIGO LOCALIDADE', 'CODIGO SETOR'), não esqueça de mapeá-las em 'centroCustoIdColumn' e 'setorIdColumn'.
+                
                 Retorne APENAS o JSON válido, sem formatações adicionais ou markdown. Use os nomes das colunas exatos que encontrar na linha de cabeçalho.
                 Se uma coluna não puder ser identificada, deixe null.
 

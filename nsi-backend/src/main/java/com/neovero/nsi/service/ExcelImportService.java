@@ -87,13 +87,16 @@ public class ExcelImportService {
             }
 
             int ccIdx = getIndex(colMap, mapping.getHierarchy() != null ? mapping.getHierarchy().getCentroCustoSourceColumn() : null);
+            int ccIdIdx = getIndex(colMap, mapping.getHierarchy() != null ? mapping.getHierarchy().getCentroCustoIdColumn() : null);
             int setorIdx = getIndex(colMap, mapping.getHierarchy() != null ? mapping.getHierarchy().getSetorSourceColumn() : null);
+            int setorIdIdx = getIndex(colMap, mapping.getHierarchy() != null ? mapping.getHierarchy().getSetorIdColumn() : null);
             int familyIdx = getIndex(colMap, mapping.getMappings() != null ? mapping.getMappings().getEquipmentFamily() : null);
             int modelIdx = getIndex(colMap, mapping.getMappings() != null ? mapping.getMappings().getModel() : null);
             int manufIdx = getIndex(colMap, mapping.getMappings() != null ? mapping.getMappings().getManufacturer() : null);
             int patriIdx = getIndex(colMap, mapping.getMappings() != null ? mapping.getMappings().getPatrimony() : null);
             int serialIdx = getIndex(colMap, mapping.getMappings() != null ? mapping.getMappings().getSerialNumber() : null);
             int legacyIdx = getIndex(colMap, mapping.getMappings() != null ? mapping.getMappings().getLegacyCode() : null);
+            int acqDateIdx = getIndex(colMap, mapping.getMappings() != null ? mapping.getMappings().getAcquisitionDate() : null);
 
             Set<String> uniqueCCs = new HashSet<>();
             Set<String> uniqueSectors = new HashSet<>();
@@ -120,13 +123,15 @@ public class ExcelImportService {
                 if (r == null) continue;
 
                 String rawCC = getVal(r, ccIdx);
+                String rawCCId = getVal(r, ccIdIdx);
                 String rawSetor = getVal(r, setorIdx);
+                String rawSetorId = getVal(r, setorIdIdx);
                 String rawFamily = getVal(r, familyIdx);
                 
                 if (rawCC.isEmpty() && rawSetor.isEmpty() && rawFamily.isEmpty()) continue;
 
-                String ccCode = normalizationService.generateLocationCode(rawCC);
-                String setorCode = normalizationService.generateLocationCode(rawSetor);
+                String ccCode = !rawCCId.isEmpty() ? rawCCId : normalizationService.generateLocationCode(rawCC);
+                String setorCode = !rawSetorId.isEmpty() ? rawSetorId : normalizationService.generateLocationCode(rawSetor);
                 
                 if (!uniqueCCs.contains(ccCode) && !ccCode.equals("UNDEF")) {
                     uniqueCCs.add(ccCode);
@@ -151,25 +156,28 @@ public class ExcelImportService {
                     String manuf = normalizationService.sanitizeManufacturer(getVal(r, manufIdx));
                     String patri = normalizationService.sanitizePatrimony(getVal(r, patriIdx));
                     String serial = normalizationService.sanitizeSerialNumber(getVal(r, serialIdx));
+                    String acqDate = getVal(r, acqDateIdx);
                     String legacy = getVal(r, legacyIdx);
 
-                    eqRow.createCell(0).setCellValue(sigla);
-                    eqRow.createCell(1).setCellValue(rawFamily.toUpperCase());
-                    eqRow.createCell(2).setCellValue(model);
-                    eqRow.createCell(3).setCellValue(manuf);
-                    eqRow.createCell(4).setCellValue(patri);
+                    eqRow.createCell(0).setCellValue(sigla); // 0: SIGLA_EQUIPAMENTO
+                    eqRow.createCell(1).setCellValue(rawFamily.toUpperCase()); // 1: EQUIPAMENTO
+                    eqRow.createCell(2).setCellValue(model); // 2: MODELO
+                    eqRow.createCell(3).setCellValue(manuf); // 3: FABRICANTE
+                    eqRow.createCell(4).setCellValue(""); // 4: REG_ANVISA (empty)
+                    eqRow.createCell(5).setCellValue(""); // 5: REG_ANVISA_VAL (empty)
+                    eqRow.createCell(6).setCellValue(""); // 6: TAG (empty)
+                    eqRow.createCell(7).setCellValue(patri); // 7: PATRIMONIO
                     
-                    Cell serialCell = eqRow.createCell(5);
+                    Cell serialCell = eqRow.createCell(8); // 8: NUMERO_SERIE
                     serialCell.setCellValue(serial);
                     if (!serial.isEmpty() && duplicateSerials.contains(serial)) {
                         serialCell.setCellStyle(redStyle);
                     }
 
-                    eqRow.createCell(6).setCellValue(setorCode);
-                    eqRow.createCell(7).setCellValue("PROPRIO");
-                    eqRow.createCell(8).setCellValue(""); 
-                    eqRow.createCell(9).setCellValue(""); 
-                    eqRow.createCell(10).setCellValue(legacy);
+                    eqRow.createCell(9).setCellValue(acqDate); // 9: DATA_AQUISICAO
+                    eqRow.createCell(15).setCellValue(setorCode); // 15: COD_SETOR
+                    eqRow.createCell(18).setCellValue("PROPRIO"); // 18: SITUACAO
+                    eqRow.createCell(19).setCellValue(legacy); // 19: COD_EQUIPAMENTO_EXTRA
                 }
             }
             
@@ -199,7 +207,9 @@ public class ExcelImportService {
         switch (cell.getCellType()) {
             case STRING: return cell.getStringCellValue();
             case NUMERIC:
-                if (DateUtil.isCellDateFormatted(cell)) return cell.getDateCellValue().toString();
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return new java.text.SimpleDateFormat("dd/MM/yyyy").format(cell.getDateCellValue());
+                }
                 double val = cell.getNumericCellValue();
                 return (val == Math.floor(val)) ? String.valueOf((long) val) : String.valueOf(val);
             case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
