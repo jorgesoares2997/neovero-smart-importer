@@ -18,7 +18,8 @@ export function Navbar() {
           <nav className="flex items-center gap-3 sm:gap-6 text-sm font-medium text-neovero-neutral-800">
             <Link href="/" className="hover:text-neovero-blue transition-colors">Início</Link>
             <Link href="/history" className="hover:text-neovero-blue transition-colors">Histórico</Link>
-            <Link href="/about" className="hover:text-neovero-blue transition-colors">Sobre o App</Link>
+            <Link href="/dashboard" className="hover:text-neovero-blue transition-colors">Dashboard</Link>
+            <Link href="/rules" className="hover:text-neovero-blue transition-colors">Regras IA</Link>
           </nav>
           
           <div className="hidden sm:flex items-center gap-4 border-l border-neovero-neutral-200 pl-6">
