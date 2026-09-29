@@ -77,7 +77,10 @@ export default function HistoryPage() {
     const cachedHistory = localStorage.getItem("nsi_history_cache");
     if (cachedHistory) {
       try {
-        setImports(JSON.parse(cachedHistory));
+        const parsed = JSON.parse(cachedHistory);
+        if (Array.isArray(parsed)) {
+          setImports(parsed);
+        }
         setLoading(false);
       } catch (e) {
         console.error("Failed to parse cache", e);
@@ -87,8 +90,12 @@ export default function HistoryPage() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1/import'}/history`)
       .then(res => res.json())
       .then(data => {
-        setImports(data);
-        localStorage.setItem("nsi_history_cache", JSON.stringify(data));
+        if (Array.isArray(data)) {
+          setImports(data);
+          localStorage.setItem("nsi_history_cache", JSON.stringify(data));
+        } else {
+          console.error("API returned non-array data:", data);
+        }
         setLoading(false);
       })
       .catch(err => {
